@@ -54,13 +54,32 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-
+void Verificar_Boton(GPIO_TypeDef *BOTONx, uint16_t BOTON_Pin);
+void Delay_ms(unsigned int);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
 #define LED_Pin GPIO_PIN_13
 #define LED_GPIO_Port GPIOC
+#define BOTON_PANICO_Pin GPIO_PIN_0
+#define BOTON_PANICO_GPIO_Port GPIOA
 /* USER CODE BEGIN Private defines */
+
+
+
+#define EST_UP			0
+#define EST_FALLING		1
+#define EST_DOWN		2
+#define EST_RISING		3
+#define EST_VALIDO		4
+
+#define	FALLING_TIME	4//(20ms)
+#define	DOWN_TIME		4//(20ms)
+#define	RISING_TIME		4//(20ms)
+
+#define BOTON_PANICO BOTON_PANICO_GPIO_Port,BOTON_PANICO_Pin
+
+
 
 /* USER CODE END Private defines */
 

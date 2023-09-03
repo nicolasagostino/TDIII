@@ -3,6 +3,7 @@
   ******************************************************************************
   * @file           : main.c
   * @brief          : Main program body
+  * @author         : Nicolas Agostino
   ******************************************************************************
   * @attention
   *
@@ -50,10 +51,14 @@ TIM_HandleTypeDef htim1;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-_Bool flag_1seg=0;
+_Bool flag_1s=0;
+_Bool flag_5ms=0;
 extern float Ax;
 extern float Ay;
 extern float Az;
+unsigned int delay_actual;
+unsigned int estado_boton;
+_Bool flag_boton_panico=false;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -73,10 +78,86 @@ void HAL_TIM_OC_DelayElapsedCallback (TIM_HandleTypeDef *htim)
 	uint32_t pulse;
 	if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1) {
 		//Acá entra cada 1seg
-		flag_1seg=1;
+		flag_1s=1;
 		pulse = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);
-		__HAL_TIM_SET_COMPARE(htim, TIM_CHANNEL_1, (pulse + (250)));
+		__HAL_TIM_SET_COMPARE(htim, TIM_CHANNEL_1, (pulse + (1000)));
 	}
+	if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2) {
+		//Acá entra cada 1ms
+		flag_5ms=1;
+		pulse = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_2);
+		__HAL_TIM_SET_COMPARE(htim, TIM_CHANNEL_2, (pulse + (5)));
+	}
+}
+//********************************************************************************
+// Función:				  Verificar_Boton
+//
+// Descripción:	Verifica que el boton se haya pulsado correctamente (anti-rebote)
+//		 (Si se agregan más botones habría que hacer un buffer para estado_boton)
+//********************************************************************************
+void Verificar_Boton(GPIO_TypeDef *BOTONx, uint16_t BOTON_Pin)
+{
+	switch(estado_boton)
+	{
+		  default:
+		  case EST_UP:
+			  if(HAL_GPIO_ReadPin(BOTONx, BOTON_Pin)==0)
+			  {
+				  estado_boton=EST_FALLING;
+				  Delay_ms(FALLING_TIME);
+			  }
+			  break;
+
+		  case EST_FALLING:
+			  if(!delay_actual)
+			  {
+				if(HAL_GPIO_ReadPin(BOTONx, BOTON_Pin)==0)
+				{
+					estado_boton=EST_DOWN;
+					Delay_ms(DOWN_TIME);
+				}
+				else
+					estado_boton=EST_UP;
+			  }
+			  break;
+
+		  case EST_DOWN:
+			  if((!delay_actual)&&(HAL_GPIO_ReadPin(BOTONx, BOTON_Pin)==1))
+			  {
+				  estado_boton=EST_RISING;
+				  Delay_ms(RISING_TIME);
+			  }
+			  break;
+
+		  case EST_RISING:
+			  if(!delay_actual)
+			  {
+				if(HAL_GPIO_ReadPin(BOTONx, BOTON_Pin)==1)
+				{
+					estado_boton=EST_UP;
+
+					//Damos como valida la pulsación del botón
+					if((BOTONx==BOTON_PANICO_GPIO_Port)&&(BOTON_Pin==BOTON_PANICO_Pin))
+						flag_boton_panico=true;
+				}
+				else
+				{
+					estado_boton=EST_DOWN;
+					Delay_ms(DOWN_TIME);
+				}
+			  }
+			  break;
+	}
+}
+//********************************************************************************
+// Función:				  Delay_ms
+//
+// Descripción:	Recargo el tiempo de delay para el pulsador
+//				(Si se agregan más botones habría que hacer un buffer)
+//********************************************************************************
+void Delay_ms(unsigned int tiempo)
+{
+	delay_actual = tiempo;
 }
 /* USER CODE END 0 */
 
@@ -118,7 +199,7 @@ int main(void)
   HAL_UART_Transmit(&huart1,(uint8_t*)&BufferDebug,strlen(BufferDebug),500);
   sprintf(BufferDebug,"\n\r      Proyecto Localizador      \n\r");
   HAL_UART_Transmit(&huart1,(uint8_t*)&BufferDebug,strlen(BufferDebug),500);
-  sprintf(BufferDebug,"\n\r          Version 1.1           \n\r");
+  sprintf(BufferDebug,"\n\r          Version 1.2           \n\r");
   HAL_UART_Transmit(&huart1,(uint8_t*)&BufferDebug,strlen(BufferDebug),500);
   sprintf(BufferDebug,"\n\r ****************************** \n\r");
   HAL_UART_Transmit(&huart1,(uint8_t*)&BufferDebug,strlen(BufferDebug),500);
@@ -133,21 +214,42 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-	mpu6050Config();
+	Verificar_Boton(BOTON_PANICO);
 
-	mpu6050GyroRead();
-	mpu6050AccelRead();
-
-	if(flag_1seg)
+	//Verifico si tocó el botón de pánico
+	if(flag_boton_panico)
 	{
-		flag_1seg=0;
+		flag_boton_panico=false;
+		sprintf(BufferDebug,"\n\r BOTON DE PANICO \n\r");
+		HAL_UART_Transmit(&huart1,(uint8_t*)&BufferDebug,strlen(BufferDebug),500);
+	}
+
+	/*------------------- Divisor 5ms ---------------------*/
+	if(flag_5ms)
+	{
+		flag_5ms=0;
+
+		if(delay_actual>0)
+			delay_actual--;
+
+	}
+	/*-------------------- Divisor 1seg --------------------*/
+	if(flag_1s)
+	{
+		flag_1s=0;
 
 		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+
+		mpu6050Config();
+		mpu6050GyroRead();
+		mpu6050AccelRead();
 
 		//Envío por puerto serie el valor de los ejes del Acelerómetro
 		sprintf(BufferDebug,"Ax: %.2f | Ay: %.2f | Az: %.2f\n\r", Ax, Ay, Az);
 		HAL_UART_Transmit(&huart1,(uint8_t*)&BufferDebug,strlen(BufferDebug),500);
+
 	}
+	/*------------------------------------------------------*/
   }
   /* USER CODE END 3 */
 }
@@ -245,7 +347,7 @@ static void MX_TIM1_Init(void)
 
   /* USER CODE END TIM1_Init 1 */
   htim1.Instance = TIM1;
-  htim1.Init.Prescaler = 64000;
+  htim1.Init.Prescaler = 16000;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim1.Init.Period = 65535;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -271,13 +373,18 @@ static void MX_TIM1_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_TIMING;
-  sConfigOC.Pulse = 250;
+  sConfigOC.Pulse = 1000;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
   sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
   if (HAL_TIM_OC_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.Pulse = 5;
+  if (HAL_TIM_OC_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
   {
     Error_Handler();
   }
@@ -294,6 +401,7 @@ static void MX_TIM1_Init(void)
   }
   /* USER CODE BEGIN TIM1_Init 2 */
   HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_1);
+  HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_2);
   /* USER CODE END TIM1_Init 2 */
 
 }
@@ -343,8 +451,8 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
@@ -355,6 +463,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : BOTON_PANICO_Pin */
+  GPIO_InitStruct.Pin = BOTON_PANICO_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(BOTON_PANICO_GPIO_Port, &GPIO_InitStruct);
 
 }
 
