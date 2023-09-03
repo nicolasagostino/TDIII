@@ -24,7 +24,7 @@
 
 #define validCondition1 (whoAreYou == mpu6050)
 
-I2C_HandleTypeDef hi2c1;
+I2C_HandleTypeDef hi2c2;
 //UART_HandleTypeDef huart2;
 
 uint8_t whoAreYou;

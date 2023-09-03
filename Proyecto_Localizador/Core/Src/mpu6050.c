@@ -10,7 +10,7 @@
 void mpu6050Init(void){
 
 	HAL_I2C_Mem_Read(
-				&hi2c1,
+				&hi2c2,
 				mpu6050addr,
 				whoAmIReg,
 				1,
@@ -23,7 +23,7 @@ void mpu6050Init(void){
 void mpu6050powerOn(void){
 	MemData = 0x00;
 	HAL_I2C_Mem_Write(
-			&hi2c1,
+			&hi2c2,
 			mpu6050addr,
 			powerManagmentReg,
 			1,
@@ -36,7 +36,7 @@ void mpu6050powerOn(void){
 void mpu6050Sampling(void){
 	MemData = 0x07;
 	HAL_I2C_Mem_Write(
-			&hi2c1,
+			&hi2c2,
 			mpu6050addr,
 			sampleRateDiv,
 			1,
@@ -50,7 +50,7 @@ void mpu6050GyroScale(gyroScale_t scale){
 	MemData = 0x00 | (scale << 3);
 
 	HAL_I2C_Mem_Write(
-			&hi2c1,
+			&hi2c2,
 			mpu6050addr,
 			gyroConf,
 			1,
@@ -64,7 +64,7 @@ void mpu6050AccelScale(accelScale_t scale){
 	MemData = 0x00 | (scale << 3);
 
 	HAL_I2C_Mem_Write(
-			&hi2c1,
+			&hi2c2,
 			mpu6050addr,
 			accelConf,
 			1,
@@ -93,7 +93,7 @@ void mpu6050Config(void){
 void mpu6050GyroRead(void){
 	uint8_t gyroData[6];
 	HAL_I2C_Mem_Read(
-			&hi2c1,
+			&hi2c2,
 			mpu6050addr,
 			gyroMeasure,
 			1,
@@ -114,7 +114,7 @@ void mpu6050GyroRead(void){
 void mpu6050AccelRead(void){
 	uint8_t accelData[6];
 	HAL_I2C_Mem_Read(
-			&hi2c1,
+			&hi2c2,
 			mpu6050addr,
 			accelMeasure,
 			1,
