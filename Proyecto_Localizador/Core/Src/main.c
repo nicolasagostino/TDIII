@@ -23,10 +23,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "mpu6050.h"
-#include "stdio.h"
-#include "stdbool.h"
-#include "string.h"
+#include "defines.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -49,16 +46,30 @@ I2C_HandleTypeDef hi2c2;
 TIM_HandleTypeDef htim1;
 
 UART_HandleTypeDef huart1;
+UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+//TIMERS
 _Bool flag_1s=0;
 _Bool flag_5ms=0;
+uint8_t contador_100ms;
+//MPU6050
 extern float Ax;
 extern float Ay;
 extern float Az;
-unsigned int delay_actual;
+extern float Gx;
+extern float Gy;
+extern float Gz;
+uint8_t movimiento_brusco_on=0;
+//Boton de Pánico
+unsigned int delay_boton;
 unsigned int estado_boton;
-_Bool flag_boton_panico=false;
+//Modem
+uint8_t cadena[3];
+extern uint8_t mensaje_enviandose;
+extern uint32_t contador_comando;
+extern uint8_t comando_a_recibir;
+extern uint8_t estado_envio_SMS;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -67,8 +78,8 @@ static void MX_GPIO_Init(void);
 static void MX_I2C2_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM1_Init(void);
+static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
-
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -83,19 +94,21 @@ void HAL_TIM_OC_DelayElapsedCallback (TIM_HandleTypeDef *htim)
 		__HAL_TIM_SET_COMPARE(htim, TIM_CHANNEL_1, (pulse + (1000)));
 	}
 	if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2) {
-		//Acá entra cada 1ms
+		//Acá entra cada 5ms
 		flag_5ms=1;
 		pulse = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_2);
 		__HAL_TIM_SET_COMPARE(htim, TIM_CHANNEL_2, (pulse + (5)));
 	}
 }
+
+
 //********************************************************************************
 // Función:				  Verificar_Boton
 //
 // Descripción:	Verifica que el boton se haya pulsado correctamente (anti-rebote)
 //		 (Si se agregan más botones habría que hacer un buffer para estado_boton)
 //********************************************************************************
-void Verificar_Boton(GPIO_TypeDef *BOTONx, uint16_t BOTON_Pin)
+_Bool Verificar_Boton(GPIO_TypeDef *BOTONx, uint16_t BOTON_Pin)
 {
 	switch(estado_boton)
 	{
@@ -109,7 +122,7 @@ void Verificar_Boton(GPIO_TypeDef *BOTONx, uint16_t BOTON_Pin)
 			  break;
 
 		  case EST_FALLING:
-			  if(!delay_actual)
+			  if(!delay_boton)
 			  {
 				if(HAL_GPIO_ReadPin(BOTONx, BOTON_Pin)==0)
 				{
@@ -122,7 +135,7 @@ void Verificar_Boton(GPIO_TypeDef *BOTONx, uint16_t BOTON_Pin)
 			  break;
 
 		  case EST_DOWN:
-			  if((!delay_actual)&&(HAL_GPIO_ReadPin(BOTONx, BOTON_Pin)==1))
+			  if((!delay_boton)&&(HAL_GPIO_ReadPin(BOTONx, BOTON_Pin)==1))
 			  {
 				  estado_boton=EST_RISING;
 				  Delay_ms(RISING_TIME);
@@ -130,7 +143,7 @@ void Verificar_Boton(GPIO_TypeDef *BOTONx, uint16_t BOTON_Pin)
 			  break;
 
 		  case EST_RISING:
-			  if(!delay_actual)
+			  if(!delay_boton)
 			  {
 				if(HAL_GPIO_ReadPin(BOTONx, BOTON_Pin)==1)
 				{
@@ -138,7 +151,7 @@ void Verificar_Boton(GPIO_TypeDef *BOTONx, uint16_t BOTON_Pin)
 
 					//Damos como valida la pulsación del botón
 					if((BOTONx==BOTON_PANICO_GPIO_Port)&&(BOTON_Pin==BOTON_PANICO_Pin))
-						flag_boton_panico=true;
+						return(true);
 				}
 				else
 				{
@@ -148,7 +161,10 @@ void Verificar_Boton(GPIO_TypeDef *BOTONx, uint16_t BOTON_Pin)
 			  }
 			  break;
 	}
+
+	return(false);
 }
+
 //********************************************************************************
 // Función:				  Delay_ms
 //
@@ -157,8 +173,34 @@ void Verificar_Boton(GPIO_TypeDef *BOTONx, uint16_t BOTON_Pin)
 //********************************************************************************
 void Delay_ms(unsigned int tiempo)
 {
-	delay_actual = tiempo;
+	delay_boton = tiempo;
 }
+
+//********************************************************************************
+// Función:				  send_uart
+//
+// Descripción:	Envia una cadena de caracteres por la UART seleccionada
+//********************************************************************************
+void send_uart(char *string, uint8_t uart_a_enviar)
+{
+	uint8_t len = strlen(string);
+
+	switch(uart_a_enviar)
+	{
+		case UART_1:
+			HAL_UART_Transmit(&huart1, (uint8_t*) string, len, 2000);
+			break;
+
+		case UART_2:
+			HAL_UART_Transmit(&huart2, (uint8_t*) string, len, 2000);
+			break;
+
+		default:
+			break;
+	}
+
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -168,7 +210,9 @@ void Delay_ms(unsigned int tiempo)
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+#ifdef DEBUG_ACELEROMETRO
 	char BufferDebug[100];
+#endif
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -192,17 +236,17 @@ int main(void)
   MX_I2C2_Init();
   MX_USART1_UART_Init();
   MX_TIM1_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
   mpu6050Init();
+  //HAL_UART_Receive_IT(&huart1, &byte1, 1);
+  HAL_UART_Receive_IT(&huart2, cadena, 1);
 
-  sprintf(BufferDebug,"\n\r ****************************** \n\r");
-  HAL_UART_Transmit(&huart1,(uint8_t*)&BufferDebug,strlen(BufferDebug),500);
-  sprintf(BufferDebug,"\n\r      Proyecto Localizador      \n\r");
-  HAL_UART_Transmit(&huart1,(uint8_t*)&BufferDebug,strlen(BufferDebug),500);
-  sprintf(BufferDebug,"\n\r          Version 1.2           \n\r");
-  HAL_UART_Transmit(&huart1,(uint8_t*)&BufferDebug,strlen(BufferDebug),500);
-  sprintf(BufferDebug,"\n\r ****************************** \n\r");
-  HAL_UART_Transmit(&huart1,(uint8_t*)&BufferDebug,strlen(BufferDebug),500);
+  send_uart("\n\r ****************************** \n\r",UART_1);
+  send_uart("\n\r      Proyecto Localizador      \n\r",UART_1);
+  send_uart("\n\r          Version 1.3           \n\r",UART_1);
+  send_uart("\n\r ****************************** \n\r",UART_1);
+
 
   /* USER CODE END 2 */
 
@@ -214,40 +258,95 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-	Verificar_Boton(BOTON_PANICO);
+
 
 	//Verifico si tocó el botón de pánico
-	if(flag_boton_panico)
+	if(Verificar_Boton(BOTON_PANICO))
 	{
-		flag_boton_panico=false;
-		sprintf(BufferDebug,"\n\r BOTON DE PANICO \n\r");
-		HAL_UART_Transmit(&huart1,(uint8_t*)&BufferDebug,strlen(BufferDebug),500);
+
+		Encolar_SMS(MSJ_BOTON_PANICO);
 	}
+
 
 	/*------------------- Divisor 5ms ---------------------*/
 	if(flag_5ms)
 	{
 		flag_5ms=0;
 
-		if(delay_actual>0)
-			delay_actual--;
+		contador_100ms++;
 
-	}
-	/*-------------------- Divisor 1seg --------------------*/
-	if(flag_1s)
-	{
-		flag_1s=0;
+		if(mensaje_enviandose!=0)
+		{
+			contador_comando++;
 
-		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+			if(contador_comando > MAXIMA_ESPERA_COMANDOS)
+			{
+				if(estado_envio_SMS<6)
+				{
+					estado_envio_SMS=6;//Por si está tirando error pq ya está conectado
+					contador_comando=0;
+					comando_a_recibir = 0;
+				}
+				else
+				{
+					Cancelar_SMS();
+				}
+
+			}
+		}
+
+		//Boton de pánico
+		if(delay_boton>0)
+			delay_boton--;
 
 		mpu6050Config();
 		mpu6050GyroRead();
 		mpu6050AccelRead();
 
+		if((!movimiento_brusco_on)&&((Gx>VALOR_GIRO_BRUSCO)||(Gy>VALOR_GIRO_BRUSCO)||(Gz>VALOR_GIRO_BRUSCO)||(Gx<(-VALOR_GIRO_BRUSCO))||(Gy<(-VALOR_GIRO_BRUSCO))||(Gz<(-VALOR_GIRO_BRUSCO))))
+		{
+			movimiento_brusco_on=TIEMPO_MOV_BRUSCO;
+
+#ifdef DEBUG_ACELEROMETRO
 		//Envío por puerto serie el valor de los ejes del Acelerómetro
 		sprintf(BufferDebug,"Ax: %.2f | Ay: %.2f | Az: %.2f\n\r", Ax, Ay, Az);
-		HAL_UART_Transmit(&huart1,(uint8_t*)&BufferDebug,strlen(BufferDebug),500);
+		send_uart(BufferDebug,UART_1);
+		sprintf(BufferDebug,"Gx: %.2f | Gy: %.2f | Gz: %.2f\n\r", Gx, Gy, Gz);
+		send_uart(BufferDebug,UART_1);
+#endif
 
+			Encolar_SMS(MSJ_MOV_BRUSCO);
+		}
+
+	}
+
+
+
+	/*-------------------- Divisor 200ms --------------------*/
+	if(contador_100ms>=20)
+	{
+		contador_100ms=0;
+
+		//Si se está enviando un mensaje, el led titila mas rapido
+		if(mensaje_enviandose != 0)
+			HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+
+
+		Enviar_SMS();
+	}
+
+	/*-------------------- Divisor 1seg --------------------*/
+
+
+	if(flag_1s)
+	{
+		if(!mensaje_enviandose) //Si no se está enviando ningun mensaje, titila cada 1seg
+			HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+
+		if(movimiento_brusco_on > 0)
+			movimiento_brusco_on--;
+
+		flag_1s=0;
 	}
 	/*------------------------------------------------------*/
   }
@@ -422,7 +521,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
+  huart1.Init.BaudRate = 9600;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
@@ -436,6 +535,39 @@ static void MX_USART1_UART_Init(void)
   /* USER CODE BEGIN USART1_Init 2 */
 
   /* USER CODE END USART1_Init 2 */
+
+}
+
+/**
+  * @brief USART2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART2_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART2_Init 0 */
+
+  /* USER CODE END USART2_Init 0 */
+
+  /* USER CODE BEGIN USART2_Init 1 */
+
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 9600;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
+
+  /* USER CODE END USART2_Init 2 */
 
 }
 
@@ -474,6 +606,25 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
+//********************************************************************************
+// Función:				  HAL_UART_RxCpltCallback
+//
+// Descripción:	Recepción de datos por UART
+//
+//********************************************************************************
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	if(huart->Instance == USART2)
+	{
+		//Interrupción por recepción de datos por UART2 (Modem)
+		uint8_t dato_recibido = cadena[0];
+
+		Recepcion_Modem(dato_recibido);
+
+		HAL_UART_Receive_IT(&huart2, cadena, 1);
+	}
+
+}
 /* USER CODE END 4 */
 
 /**

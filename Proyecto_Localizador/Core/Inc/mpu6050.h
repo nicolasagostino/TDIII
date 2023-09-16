@@ -21,6 +21,8 @@
 #define accelMeasure      0x3B
 #define gyroMeasure       0x43
 
+#define VALOR_GIRO_BRUSCO 249	//Cuanto más chico, más sensible
+#define TIEMPO_MOV_BRUSCO 10 	//Espera esta cantidad de segundos para detectar otra vez
 
 #define validCondition1 (whoAreYou == mpu6050)
 

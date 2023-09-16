@@ -54,8 +54,9 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-void Verificar_Boton(GPIO_TypeDef *BOTONx, uint16_t BOTON_Pin);
+_Bool  Verificar_Boton(GPIO_TypeDef *BOTONx, uint16_t BOTON_Pin);
 void Delay_ms(unsigned int);
+void send_uart(char *string, uint8_t uart_a_enviar);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
@@ -65,7 +66,7 @@ void Delay_ms(unsigned int);
 #define BOTON_PANICO_GPIO_Port GPIOA
 /* USER CODE BEGIN Private defines */
 
-
+#define DEBUG_ACELEROMETRO
 
 #define EST_UP			0
 #define EST_FALLING		1
