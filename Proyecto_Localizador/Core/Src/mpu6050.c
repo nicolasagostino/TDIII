@@ -7,6 +7,23 @@
 
 #include "mpu6050.h"
 
+I2C_HandleTypeDef hi2c2;
+
+uint8_t whoAreYou;
+uint8_t MemData;
+
+int16_t RAWgyroX;
+int16_t RAWgyroY;
+int16_t RAWgyroZ;
+
+int16_t RAWaccelX;
+int16_t RAWaccelY;
+int16_t RAWaccelZ;
+
+float Ax, Ay, Az;
+float Gx, Gy, Gz;
+
+
 void mpu6050Init(void){
 
 	HAL_I2C_Mem_Read(

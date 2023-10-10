@@ -66,7 +66,7 @@ void send_uart(char *string, uint8_t uart_a_enviar);
 #define BOTON_PANICO_GPIO_Port GPIOA
 /* USER CODE BEGIN Private defines */
 
-#define DEBUG_ACELEROMETRO
+//#define DEBUG_ACELEROMETRO
 
 #define EST_UP			0
 #define EST_FALLING		1

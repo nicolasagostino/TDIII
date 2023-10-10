@@ -54,6 +54,7 @@ _Bool flag_1s=0;
 _Bool flag_5ms=0;
 uint8_t contador_100ms;
 //MPU6050
+
 extern float Ax;
 extern float Ay;
 extern float Az;
@@ -210,9 +211,7 @@ void send_uart(char *string, uint8_t uart_a_enviar)
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-#ifdef DEBUG_ACELEROMETRO
 	char BufferDebug[100];
-#endif
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -244,7 +243,7 @@ int main(void)
 
   send_uart("\n\r ****************************** \n\r",UART_1);
   send_uart("\n\r      Proyecto Localizador      \n\r",UART_1);
-  send_uart("\n\r          Version 1.3           \n\r",UART_1);
+  send_uart("\n\r          Version 1.4           \n\r",UART_1);
   send_uart("\n\r ****************************** \n\r",UART_1);
 
 
@@ -307,13 +306,11 @@ int main(void)
 		{
 			movimiento_brusco_on=TIEMPO_MOV_BRUSCO;
 
-#ifdef DEBUG_ACELEROMETRO
-		//Envío por puerto serie el valor de los ejes del Acelerómetro
-		sprintf(BufferDebug,"Ax: %.2f | Ay: %.2f | Az: %.2f\n\r", Ax, Ay, Az);
-		send_uart(BufferDebug,UART_1);
-		sprintf(BufferDebug,"Gx: %.2f | Gy: %.2f | Gz: %.2f\n\r", Gx, Gy, Gz);
-		send_uart(BufferDebug,UART_1);
-#endif
+			//Envío por puerto serie el valor de los ejes del Acelerómetro
+			sprintf(BufferDebug,"Ax: %.2f | Ay: %.2f | Az: %.2f\n\r", Ax, Ay, Az);
+			send_uart(BufferDebug,UART_1);
+			sprintf(BufferDebug,"Gx: %.2f | Gy: %.2f | Gz: %.2f\n\r", Gx, Gy, Gz);
+			send_uart(BufferDebug,UART_1);
 
 			Encolar_SMS(MSJ_MOV_BRUSCO);
 		}
@@ -340,6 +337,15 @@ int main(void)
 
 	if(flag_1s)
 	{
+
+#ifdef DEBUG_ACELEROMETRO
+		//Envío por puerto serie el valor de los ejes del Acelerómetro
+		sprintf(BufferDebug,"Ax: %.2f | Ay: %.2f | Az: %.2f\n\r", Ax, Ay, Az);
+		send_uart(BufferDebug,UART_1);
+		sprintf(BufferDebug,"Gx: %.2f | Gy: %.2f | Gz: %.2f\n\r", Gx, Gy, Gz);
+		send_uart(BufferDebug,UART_1);
+#endif
+
 		if(!mensaje_enviandose) //Si no se está enviando ningun mensaje, titila cada 1seg
 			HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 
