@@ -64,6 +64,8 @@ void send_uart(char *string, uint8_t uart_a_enviar);
 #define LED_GPIO_Port GPIOC
 #define BOTON_PANICO_Pin GPIO_PIN_0
 #define BOTON_PANICO_GPIO_Port GPIOA
+#define NSS_Pin GPIO_PIN_4
+#define NSS_GPIO_Port GPIOA
 /* USER CODE BEGIN Private defines */
 
 //#define DEBUG_ACELEROMETRO
@@ -74,9 +76,9 @@ void send_uart(char *string, uint8_t uart_a_enviar);
 #define EST_RISING		3
 #define EST_VALIDO		4
 
-#define	FALLING_TIME	4//(20ms)
-#define	DOWN_TIME		4//(20ms)
-#define	RISING_TIME		4//(20ms)
+#define	FALLING_TIME	2//(100ms)
+#define	DOWN_TIME		2//(100ms)
+#define	RISING_TIME		2//(100ms)
 
 #define BOTON_PANICO BOTON_PANICO_GPIO_Port,BOTON_PANICO_Pin
 

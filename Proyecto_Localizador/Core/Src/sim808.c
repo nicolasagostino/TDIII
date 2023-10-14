@@ -20,6 +20,7 @@ bool primer_mensaje_enviado=false;
 uint32_t contador_comando=0;
 uint8_t dato_Rx[SIZE_RX];
 volatile uint8_t indice =0;
+extern struct GPS_Data GPS;
 //******************************************************//
 
 
@@ -153,15 +154,24 @@ void Enviar_SMS(void)
 					break;
 
 					case MSJ_BOTON_PANICO:
-						send_uart("Boton de Panico",UART_1);
+						send_uart("Boton de Panico ",UART_1);
+
+						if(GPS.Estado == 'A')//A = posicion valida
+							Armar_Link_Google_Maps(UART_1); //Mando la ultima ubicación valida indicando su fecha y hora
 						break;
 
 					case MSJ_MOV_BRUSCO:
-						send_uart("Movimiento Brusco",UART_1);
+						send_uart("Movimiento Brusco ",UART_1);
+
+						if(GPS.Estado == 'A')//A = posicion valida
+							Armar_Link_Google_Maps(UART_1); //Mando la ultima ubicación valida indicando su fecha y hora
 						break;
 
 					case MSJ_UBICACION:
-						send_uart("Ubicacion desconocida",UART_1);
+						if(GPS.Estado == 'A')//A = posicion valida
+							Armar_Link_Google_Maps(UART_1); //Mando la ultima ubicación valida indicando su fecha y hora
+						else
+							send_uart("Ubicacion desconocida",UART_1);
 						break;
 				}
 				send_uart("\n\r",UART_1);
@@ -293,15 +303,28 @@ void Enviar_SMS(void)
 					break;
 
 					case MSJ_BOTON_PANICO:
+						if(GPS.Estado == 'A')//A = posicion valida
+							Armar_Link_Google_Maps(UART_2); //Mando la ultima ubicación valida indicando su fecha y hora
+
 						send_uart("Boton de Panico",UART_2);
 						break;
 
 					case MSJ_MOV_BRUSCO:
+						if(GPS.Estado == 'A')//A = posicion valida
+							Armar_Link_Google_Maps(UART_2); //Mando la ultima ubicación valida indicando su fecha y hora
+
 						send_uart("Movimiento Brusco",UART_2);
 						break;
 
 					case MSJ_UBICACION:
-						send_uart("Ubicacion desconocida",UART_2);
+						if(GPS.Estado == 'A')//A = posicion valida
+						{
+							Armar_Link_Google_Maps(UART_2); //Mando la ultima ubicación valida indicando su fecha y hora
+
+							send_uart("Solicitud de Seguimiento",UART_2);
+						}
+						else
+							send_uart("Ubicacion desconocida",UART_2);
 						break;
 				}
 				HAL_UART_Transmit(&huart2, &controlZ, 1, 2000);

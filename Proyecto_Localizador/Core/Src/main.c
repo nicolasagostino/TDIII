@@ -20,6 +20,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "fatfs.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -43,6 +44,8 @@
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c2;
 
+SPI_HandleTypeDef hspi1;
+
 TIM_HandleTypeDef htim1;
 
 UART_HandleTypeDef huart1;
@@ -51,7 +54,7 @@ UART_HandleTypeDef huart2;
 /* USER CODE BEGIN PV */
 //TIMERS
 _Bool flag_1s=0;
-_Bool flag_5ms=0;
+_Bool flag_50ms=0;
 uint8_t contador_100ms;
 //MPU6050
 
@@ -71,6 +74,10 @@ extern uint8_t mensaje_enviandose;
 extern uint32_t contador_comando;
 extern uint8_t comando_a_recibir;
 extern uint8_t estado_envio_SMS;
+//microSD
+SPISD spisd;
+SPISD *mainSD = &spisd;
+uint8_t Sector0[516];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -80,6 +87,7 @@ static void MX_I2C2_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
 /* USER CODE END PFP */
 
@@ -95,10 +103,10 @@ void HAL_TIM_OC_DelayElapsedCallback (TIM_HandleTypeDef *htim)
 		__HAL_TIM_SET_COMPARE(htim, TIM_CHANNEL_1, (pulse + (1000)));
 	}
 	if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2) {
-		//Acá entra cada 5ms
-		flag_5ms=1;
+		//Acá entra cada 50ms
+		flag_50ms=1;
 		pulse = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_2);
-		__HAL_TIM_SET_COMPARE(htim, TIM_CHANNEL_2, (pulse + (5)));
+		__HAL_TIM_SET_COMPARE(htim, TIM_CHANNEL_2, (pulse + (50)));
 	}
 }
 
@@ -227,7 +235,12 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
+  //SD
+  spisd.FSM=Encendido;
+  spisd.csPuerto = NSS_GPIO_Port;
+  spisd.csPin = NSS_Pin;
+  spisd.puertoSPI = &hspi1;
+  spisd.sectorAddressing=1; //Asumimos SDHC (+2GB)
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -236,16 +249,32 @@ int main(void)
   MX_USART1_UART_Init();
   MX_TIM1_Init();
   MX_USART2_UART_Init();
+  MX_SPI1_Init();
+  MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
   mpu6050Init();
   //HAL_UART_Receive_IT(&huart1, &byte1, 1);
+  HAL_UART_Receive_IT(&huart1, cadena, 1);
   HAL_UART_Receive_IT(&huart2, cadena, 1);
 
   send_uart("\n\r ****************************** \n\r",UART_1);
   send_uart("\n\r      Proyecto Localizador      \n\r",UART_1);
-  send_uart("\n\r          Version 1.4           \n\r",UART_1);
+  send_uart("\n\r          Version 1.5           \n\r",UART_1);
   send_uart("\n\r ****************************** \n\r",UART_1);
 
+
+  //Creo un archivo en la tarjeta microSD
+  f_mount(&USERFatFS,USERPath,0);
+  f_open(&USERFile,"MiArch.txt",FA_CREATE_ALWAYS | FA_WRITE);
+  uint32_t output;
+  if (f_write(&USERFile,"Hola Mundo SD Card!",sizeof("Hola Mundo SD Card!"),(void*)&output)==FR_OK)
+  {
+	  if (f_sync(&USERFile)==FR_OK){
+		  f_close(&USERFile);
+	  }
+
+
+  }
 
   /* USER CODE END 2 */
 
@@ -268,9 +297,9 @@ int main(void)
 
 
 	/*------------------- Divisor 5ms ---------------------*/
-	if(flag_5ms)
+	if(flag_50ms)
 	{
-		flag_5ms=0;
+		flag_50ms=0;
 
 		contador_100ms++;
 
@@ -320,7 +349,7 @@ int main(void)
 
 
 	/*-------------------- Divisor 200ms --------------------*/
-	if(contador_100ms>=20)
+	if(contador_100ms>=2)
 	{
 		contador_100ms=0;
 
@@ -432,6 +461,44 @@ static void MX_I2C2_Init(void)
 }
 
 /**
+  * @brief SPI1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI1_Init(void)
+{
+
+  /* USER CODE BEGIN SPI1_Init 0 */
+
+  /* USER CODE END SPI1_Init 0 */
+
+  /* USER CODE BEGIN SPI1_Init 1 */
+
+  /* USER CODE END SPI1_Init 1 */
+  /* SPI1 parameter configuration*/
+  hspi1.Instance = SPI1;
+  hspi1.Init.Mode = SPI_MODE_MASTER;
+  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi1.Init.NSS = SPI_NSS_SOFT;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128;
+  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi1.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI1_Init 2 */
+
+  /* USER CODE END SPI1_Init 2 */
+
+}
+
+/**
   * @brief TIM1 Initialization Function
   * @param None
   * @retval None
@@ -527,7 +594,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 9600;
+  huart1.Init.BaudRate = 4800;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
@@ -595,6 +662,9 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(NSS_GPIO_Port, NSS_Pin, GPIO_PIN_RESET);
+
   /*Configure GPIO pin : LED_Pin */
   GPIO_InitStruct.Pin = LED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -608,6 +678,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(BOTON_PANICO_GPIO_Port, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : NSS_Pin */
+  GPIO_InitStruct.Pin = NSS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(NSS_GPIO_Port, &GPIO_InitStruct);
+
 }
 
 /* USER CODE BEGIN 4 */
@@ -620,16 +697,24 @@ static void MX_GPIO_Init(void)
 //********************************************************************************
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-	if(huart->Instance == USART2)
+	uint8_t dato_recibido = cadena[0];
+
+	if(huart->Instance == USART1)
+	{
+		//Interrupción por recepción de datos por UART1 (GPS)
+
+		Recepcion_GPS(dato_recibido);
+
+		HAL_UART_Receive_IT(&huart1, cadena, 1);
+	}
+	else if(huart->Instance == USART2)
 	{
 		//Interrupción por recepción de datos por UART2 (Modem)
-		uint8_t dato_recibido = cadena[0];
 
 		Recepcion_Modem(dato_recibido);
 
 		HAL_UART_Receive_IT(&huart2, cadena, 1);
 	}
-
 }
 /* USER CODE END 4 */
 
