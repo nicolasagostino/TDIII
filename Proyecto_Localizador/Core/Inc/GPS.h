@@ -11,7 +11,7 @@
 
 struct GPS_Data
 {
-	uint8_t Hora;
+	int8_t Hora;		//Signado por si se le resta el GMT
 	uint8_t Minutos;
 	uint8_t Segundos;
 
@@ -28,9 +28,9 @@ struct GPS_Data
 	float	Velocidad;
 	float	Curso;
 
-	uint8_t Dia;
-	uint8_t Mes;
-	uint8_t Anio;
+	int8_t Dia;
+	int8_t Mes;
+	int8_t Anio;
 
 	uint8_t Checksum;
 };

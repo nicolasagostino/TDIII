@@ -57,6 +57,7 @@ void Error_Handler(void);
 _Bool  Verificar_Boton(GPIO_TypeDef *BOTONx, uint16_t BOTON_Pin);
 void Delay_ms(unsigned int);
 void send_uart(char *string, uint8_t uart_a_enviar);
+void Manejo_Led(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/

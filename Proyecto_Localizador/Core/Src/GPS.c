@@ -13,10 +13,11 @@ struct GPS_Data GPS;
 struct GPS_Data GPS_aux;
 uint8_t pos_gps;
 uint8_t checksum_aux=0;
+_Bool flag_primer_GPS=false;
 //********************************************************************************
 // Función:				  Recepcion_GPS
 //
-// Descripción:	Recepción de datos del módulo GPS
+// Descripción:	Recepción de datos del módulo GPS (Trama GPRMC)
 //
 //********************************************************************************
 void Recepcion_GPS (uint8_t dato)
@@ -466,6 +467,9 @@ void Recepcion_GPS (uint8_t dato)
 					{
 						//send_uart("\n\r*************\n\r",UART_1);
 						send_uart(" Toma GPS!!! \n\r",UART_1);
+						if(!flag_primer_GPS)
+							Encolar_SMS(TOMO_GPS);
+						flag_primer_GPS=true;
 						//send_uart("*************\n\r\n\r",UART_1);
 					}
 
@@ -481,6 +485,11 @@ void Recepcion_GPS (uint8_t dato)
 }
 
 
+//********************************************************************************
+// Función:				  Espero_Fin_Estado
+//
+// Descripción:	Funcion usada cuando en la trama debería llegar una coma
+//********************************************************************************
 void Espero_Fin_Estado(uint8_t espero_coma)
 {
 	//Si no me llega una coma, algo anda mal...
@@ -493,7 +502,11 @@ void Espero_Fin_Estado(uint8_t espero_coma)
 		Estado_Recepcion_GPS=REINICIAR_TRAMA;
 }
 
-
+//********************************************************************************
+// Función:				  Espero_Punto
+//
+// Descripción:	Funcion usada cuando en la trama debería llegar un punto
+//********************************************************************************
 void Espero_Punto(uint8_t espero_punt)
 {
 	//Si no me llega una coma, algo anda mal...
@@ -503,8 +516,11 @@ void Espero_Punto(uint8_t espero_punt)
 		Estado_Recepcion_GPS=REINICIAR_TRAMA;
 }
 
-
-// Función para ajustar la fecha y hora según GMT
+//********************************************************************************
+// Función:				  ajustarSegunGMT
+//
+// Descripción:	Función para ajustar la fecha y hora según GMT
+//********************************************************************************
 void ajustarSegunGMT(struct GPS_Data *dt, int GMT_offset)
 {
     // Asegurarse de que el desplazamiento esté en el rango [-12, 12]
@@ -570,7 +586,11 @@ void ajustarSegunGMT(struct GPS_Data *dt, int GMT_offset)
         dt->Mes += 1;
     }
 }
-
+//********************************************************************************
+// Función:				  Armar_Link_Google_Maps
+//
+// Descripción:	Ubica el punto en el que estamos ubicados en el Google Maps
+//********************************************************************************
 void Armar_Link_Google_Maps(uint8_t uart_envio)
 {
 	char Buffer_Maps[100];

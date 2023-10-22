@@ -26,7 +26,8 @@
 enum{
 	MSJ_BOTON_PANICO=1,
 	MSJ_MOV_BRUSCO,
-	MSJ_UBICACION
+	MSJ_UBICACION,
+	TOMO_GPS,
 };
 
 //****************** Funciones ***********************//

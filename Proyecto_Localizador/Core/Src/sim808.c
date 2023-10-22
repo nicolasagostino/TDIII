@@ -21,6 +21,9 @@ uint32_t contador_comando=0;
 uint8_t dato_Rx[SIZE_RX];
 volatile uint8_t indice =0;
 extern struct GPS_Data GPS;
+uint8_t pos_num=0;
+_Bool flag_num_valido=false;
+char Numero_Cel[13];
 //******************************************************//
 
 
@@ -76,16 +79,22 @@ void Recepcion_Modem (uint8_t dato)
 				default:
 					if(dato=='@')
 						Estado_Recepcion++;
+					else if(dato=='+')
+						Estado_Recepcion=4;
 					break;
 
 				case 1:
 					if(dato=='U')
 						Estado_Recepcion++;
+					else
+						Estado_Recepcion=0;
 					break;
 
 				case 2:
 					if(dato=='B')
 						Estado_Recepcion++;
+					else
+						Estado_Recepcion=0;
 					break;
 
 				case 3:
@@ -94,7 +103,85 @@ void Recepcion_Modem (uint8_t dato)
 						Estado_Recepcion=0;
 						Encolar_SMS(MSJ_UBICACION);
 					}
+					else
+						Estado_Recepcion=0;
 					break;
+
+				case 4:
+					if(dato=='C')
+						Estado_Recepcion++;
+					else
+						Estado_Recepcion=0;
+					break;
+
+				case 5:
+					if(dato=='M')
+						Estado_Recepcion++;
+					else
+						Estado_Recepcion=0;
+					break;
+
+				case 6:
+					if(dato=='T')
+						Estado_Recepcion++;
+					else
+						Estado_Recepcion=0;
+					break;
+
+				case 7:
+					if(dato==':')
+						Estado_Recepcion++;
+					else
+						Estado_Recepcion=0;
+					break;
+
+				case 8:
+					if(dato==' ')
+						Estado_Recepcion++;
+					else
+						Estado_Recepcion=0;
+					break;
+
+				case 9:
+					if(dato=='"')
+						Estado_Recepcion++;
+					else
+						Estado_Recepcion=0;
+					break;
+
+				case 10:
+					if(dato=='+')
+					{
+						Estado_Recepcion++;
+						pos_num=0;
+						flag_num_valido=false;
+					}
+					else
+						Estado_Recepcion=0;
+					break;
+
+				case 11:
+					if((dato>='0')||(dato<='9'))
+					{
+						//Guardo el numero de quien me envió el SMS
+						Numero_Cel[pos_num]=dato;
+						pos_num++;
+
+						if(pos_num>=13)
+						{
+							flag_num_valido=true;
+							Estado_Recepcion=0;
+							Encolar_SMS(MSJ_UBICACION);
+						}
+					}
+					else
+					{
+						Estado_Recepcion=0;
+						pos_num=0;
+						flag_num_valido=false;
+					}
+					break;
+
 			}
 			break;
 	}
@@ -138,6 +225,7 @@ void Encolar_SMS(uint8_t mensaje)
 void Enviar_SMS(void)
 {
 	uint8_t controlZ = 26; // 26 es el valor ASCII para CTRL+Z
+	char Buffer_Comando_Num[30];
 
 	switch(estado_envio_SMS)
 	{
@@ -169,7 +257,23 @@ void Enviar_SMS(void)
 
 					case MSJ_UBICACION:
 						if(GPS.Estado == 'A')//A = posicion valida
+						{
 							Armar_Link_Google_Maps(UART_1); //Mando la ultima ubicación valida indicando su fecha y hora
+
+							send_uart("Solicitud de Seguimiento",UART_1);
+						}
+						else
+							send_uart("Ubicacion desconocida",UART_1);
+						break;
+
+
+					case TOMO_GPS:
+						if(GPS.Estado == 'A')//A = posicion valida
+						{
+							Armar_Link_Google_Maps(UART_1); //Mando la ultima ubicación valida indicando su fecha y hora
+
+							send_uart("Posicion establecida",UART_1);
+						}
 						else
 							send_uart("Ubicacion desconocida",UART_1);
 						break;
@@ -281,7 +385,15 @@ void Enviar_SMS(void)
 		case 7:
 			if((!comando_a_recibir)||(contador_comando%TIEMPO_REINTENTO_COMANDO==0))
 			{
-				send_uart("AT+CMGS=\"+5491164881307\"\r\n",UART_2);
+				if(!flag_num_valido)
+					send_uart("AT+CMGS=\"+5491164881307\"\r\n",UART_2); //Por default envio a mi numero personal
+				else
+				{
+					//Si se registró el numero que pidió la ubicacion, se lo manda a ese numero
+					sprintf(Buffer_Comando_Num,"AT+CMGS=\"+%s\"\r\n", Numero_Cel);
+					send_uart(Buffer_Comando_Num,UART_2);
+					flag_num_valido=0;
+				}
 				espero_comando(COMANDO_PICO);
 			}
 			else if(comando_recibido == comando_a_recibir)
@@ -322,6 +434,18 @@ void Enviar_SMS(void)
 							Armar_Link_Google_Maps(UART_2); //Mando la ultima ubicación valida indicando su fecha y hora
 
 							send_uart("Solicitud de Seguimiento",UART_2);
+						}
+						else
+							send_uart("Ubicacion desconocida",UART_2);
+						break;
+
+
+					case TOMO_GPS:
+						if(GPS.Estado == 'A')//A = posicion valida
+						{
+							Armar_Link_Google_Maps(UART_2); //Mando la ultima ubicación valida indicando su fecha y hora
+
+							send_uart("Posicion establecida",UART_2);
 						}
 						else
 							send_uart("Ubicacion desconocida",UART_2);

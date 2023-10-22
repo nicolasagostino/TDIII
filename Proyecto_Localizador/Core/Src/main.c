@@ -78,6 +78,10 @@ extern uint8_t estado_envio_SMS;
 SPISD spisd;
 SPISD *mainSD = &spisd;
 uint8_t Sector0[516];
+//GPS
+extern struct GPS_Data GPS_aux;
+//Led
+uint8_t contador_led=0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -210,6 +214,46 @@ void send_uart(char *string, uint8_t uart_a_enviar)
 
 }
 
+//********************************************************************************
+// Función:				  Manejo_Led
+//
+// Descripción:	Se modifica la velocidad en la que titila el led segun el estado
+//********************************************************************************
+void Manejo_Led(void)
+{
+	//Aca entra cada 50ms;
+	contador_led++;
+
+	if(mensaje_enviandose != 0)
+	{
+		//Si está enviando un SMS titila bien rápido (c/ 100ms)
+		if(contador_led>1)
+		{
+			HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+			contador_led=0;
+		}
+	}
+	else if(GPS_aux.Estado != 'A')
+	{
+		//Si no tiene GPS titila rápido, pero no tanto como cuando manda un SMS (c/ 250ms)
+		if(contador_led>5)
+		{
+			HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+			contador_led=0;
+		}
+	}
+	else
+	{
+		//En estado normal titila lento (c/ 1s)
+		if(contador_led>19)
+		{
+			HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+			contador_led=0;
+		}
+	}
+
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -259,7 +303,7 @@ int main(void)
 
   send_uart("\n\r ****************************** \n\r",UART_1);
   send_uart("\n\r      Proyecto Localizador      \n\r",UART_1);
-  send_uart("\n\r          Version 1.5           \n\r",UART_1);
+  send_uart("\n\r          Version 1.6           \n\r",UART_1);
   send_uart("\n\r ****************************** \n\r",UART_1);
 
 
@@ -302,6 +346,8 @@ int main(void)
 		flag_50ms=0;
 
 		contador_100ms++;
+
+		Manejo_Led();
 
 		if(mensaje_enviandose!=0)
 		{
@@ -347,16 +393,10 @@ int main(void)
 	}
 
 
-
 	/*-------------------- Divisor 200ms --------------------*/
 	if(contador_100ms>=2)
 	{
 		contador_100ms=0;
-
-		//Si se está enviando un mensaje, el led titila mas rapido
-		if(mensaje_enviandose != 0)
-			HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-
 
 		Enviar_SMS();
 	}
@@ -374,9 +414,6 @@ int main(void)
 		sprintf(BufferDebug,"Gx: %.2f | Gy: %.2f | Gz: %.2f\n\r", Gx, Gy, Gz);
 		send_uart(BufferDebug,UART_1);
 #endif
-
-		if(!mensaje_enviandose) //Si no se está enviando ningun mensaje, titila cada 1seg
-			HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 
 		if(movimiento_brusco_on > 0)
 			movimiento_brusco_on--;
