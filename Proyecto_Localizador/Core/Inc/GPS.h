@@ -55,10 +55,13 @@ enum Trama_RMC
 
 #define GMT	-3 //Argentina
 
+#define GOOGLE_MAPS	 0
+#define GOOGLE_EARTH 1
+
 void Recepcion_GPS (uint8_t);
 void Espero_Fin_Estado (uint8_t);
 void Espero_Punto(uint8_t);
 void ajustarSegunGMT(struct GPS_Data *dt, int GMT_offset);
-void Armar_Link_Google_Maps(uint8_t);
+void Armar_Ubi_Google(uint8_t, uint8_t, _Bool);
 
 #endif /* INC_GPS_H_ */

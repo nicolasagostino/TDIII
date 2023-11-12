@@ -7,6 +7,7 @@
 
 #include "defines.h"
 
+#ifdef USE_GPS
 uint8_t indice_gps=0;
 uint8_t Estado_Recepcion_GPS=0;
 struct GPS_Data GPS;
@@ -465,12 +466,10 @@ void Recepcion_GPS (uint8_t dato)
 				{
 					if(GPS.Estado!=GPS_aux.Estado)
 					{
-						//send_uart("\n\r*************\n\r",UART_1);
 						send_uart(" Toma GPS!!! \n\r",UART_1);
 						if(!flag_primer_GPS)
 							Encolar_SMS(TOMO_GPS);
 						flag_primer_GPS=true;
-						//send_uart("*************\n\r\n\r",UART_1);
 					}
 
 					GPS = GPS_aux;
@@ -587,12 +586,13 @@ void ajustarSegunGMT(struct GPS_Data *dt, int GMT_offset)
     }
 }
 //********************************************************************************
-// Función:				  Armar_Link_Google_Maps
+// Función:				  Armar_Ubi_Google
 //
 // Descripción:	Ubica el punto en el que estamos ubicados en el Google Maps
 //********************************************************************************
-void Armar_Link_Google_Maps(uint8_t uart_envio)
+void Armar_Ubi_Google(uint8_t uart_envio, uint8_t app, _Bool guardar_FS)
 {
+
 	char Buffer_Maps[100];
 	int latitud_grados_aux;
 	int longitud_grados_aux;
@@ -618,10 +618,27 @@ void Armar_Link_Google_Maps(uint8_t uart_envio)
 	minutos_aux=minutos_aux*10000000;
 	longitud_min_aux=minutos_aux;
 
+	switch(app)
+	{
+		default:
+		case GOOGLE_MAPS:
+			//Genero Link para visualizar en Google Maps
+			sprintf(Buffer_Maps,"https://www.google.com/maps/@%i.%d,%i.%d,20z (%02d/%02d/%02d %02d:%02d:%02d) ",latitud_grados_aux,latitud_min_aux,longitud_grados_aux,longitud_min_aux,GPS.Dia,GPS.Mes,GPS.Anio,GPS.Hora,GPS.Minutos,GPS.Segundos);
+			send_uart(Buffer_Maps,uart_envio);
+			break;
 
-	sprintf(Buffer_Maps,"https://www.google.com/maps/@%i.%d,%i.%d,20z (%02d/%02d/%02d %02d:%02d:%02d) ",latitud_grados_aux,latitud_min_aux,longitud_grados_aux,longitud_min_aux,GPS.Dia,GPS.Mes,GPS.Anio,GPS.Hora,GPS.Minutos,GPS.Segundos);
+		case GOOGLE_EARTH:
+			//Escribo la latitud y longitud en el formato que interpreta Google Earth
+			//Ej:-58.5276153,-34.6658579,0
+			//send_uart("-58.5276153,-34.6658579,0\n",uart_envio);
+			sprintf(Buffer_Maps,"%i.%d,%i.%d,0\n",longitud_grados_aux,longitud_min_aux,latitud_grados_aux,latitud_min_aux);
+			send_uart(Buffer_Maps,uart_envio);
+			break;
+	}
 
-	send_uart(Buffer_Maps,uart_envio);
-
+	if(guardar_FS)
+		send_uart("\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r", uart_envio);//Por si se queda corto... siempre espera la cantidad de bytes que le dije
 
 }
+
+#endif

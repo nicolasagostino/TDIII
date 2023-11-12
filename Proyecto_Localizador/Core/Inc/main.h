@@ -65,8 +65,6 @@ void Manejo_Led(void);
 #define LED_GPIO_Port GPIOC
 #define BOTON_PANICO_Pin GPIO_PIN_0
 #define BOTON_PANICO_GPIO_Port GPIOA
-#define NSS_Pin GPIO_PIN_4
-#define NSS_GPIO_Port GPIOA
 /* USER CODE BEGIN Private defines */
 
 //#define DEBUG_ACELEROMETRO
@@ -84,6 +82,8 @@ void Manejo_Led(void);
 #define BOTON_PANICO BOTON_PANICO_GPIO_Port,BOTON_PANICO_Pin
 
 
+#define UART_1	1
+#define UART_2	2
 
 /* USER CODE END Private defines */
 

@@ -7,25 +7,27 @@
 
 #include "defines.h"
 
+#ifdef USE_SIM808
 //***************** Variables **************************//
+
 extern UART_HandleTypeDef huart2;
 extern uint8_t cadena[3];
 uint8_t Estado_Recepcion;
-uint8_t comando_a_recibir=0;
-uint8_t comando_recibido=0;
-uint8_t estado_envio_SMS=0;
-uint8_t mensaje_a_enviar=0;
-uint8_t mensaje_enviandose=0;
-bool primer_mensaje_enviado=false;
-uint32_t contador_comando=0;
+uint8_t comando_a_recibir = 0;
+uint8_t comando_recibido = 0;
+uint8_t estado_envio_SMS = 0;
+uint8_t mensaje_a_enviar = 0;
+uint8_t mensaje_enviandose = 0;
+bool primer_mensaje_enviado = false;
+uint32_t contador_comando = 0;
 uint8_t dato_Rx[SIZE_RX];
-volatile uint8_t indice =0;
+volatile uint8_t indice = 0;
 extern struct GPS_Data GPS;
-uint8_t pos_num=0;
-_Bool flag_num_valido=false;
+uint8_t pos_num = 0;
+_Bool flag_num_valido = false;
 char Numero_Cel[13];
+uint8_t contador_seg = 0;
 //******************************************************//
-
 
 //********************************************************************************
 // Función:				  Recepcion_Modem
@@ -33,152 +35,154 @@ char Numero_Cel[13];
 // Descripción:	Recepción de datos del Modem por UART
 //
 //********************************************************************************
-void Recepcion_Modem (uint8_t dato)
+
+void Recepcion_Modem(uint8_t dato)
 {
 	dato_Rx[indice++] = dato;
 
-	if(indice >= SIZE_RX)
-		indice=0;
-	switch(comando_a_recibir)
+	if (indice >= SIZE_RX)
+		indice = 0;
+
+	switch (comando_a_recibir)
 	{
 
 		case COMANDO_OK:
-			switch(Estado_Recepcion)
+			switch (Estado_Recepcion)
 			{
 				case 0:
 				default:
-					if(dato=='O')
+					if (dato == 'O')
 					{
-						Estado_Recepcion=1;
+						Estado_Recepcion = 1;
 					}
 					break;
 
 				case 1:
-					if(dato=='K')
+					if (dato == 'K')
 					{
-						Estado_Recepcion=0;
-						comando_recibido=COMANDO_OK;//Llegó el comando esperado
+						Estado_Recepcion = 0;
+						comando_recibido = COMANDO_OK; //Llegó el comando esperado
 					}
 					break;
 			}
 			break;
 
 		case COMANDO_PICO:
-			if(dato=='>')
+			if (dato == '>')
 			{
-				Estado_Recepcion=0;
-				comando_recibido=COMANDO_PICO;//Llegó el comando esperado
+				Estado_Recepcion = 0;
+				comando_recibido = COMANDO_PICO; //Llegó el comando esperado
 			}
 			break;
 
 		default:
 			//Puede llegarme un comando por SMS
-			switch(Estado_Recepcion)
+			switch (Estado_Recepcion)
 			{
 				case 0:
 				default:
-					if(dato=='@')
+					if (dato == '@')
 						Estado_Recepcion++;
-					else if(dato=='+')
-						Estado_Recepcion=4;
+					else if (dato == '+')
+						Estado_Recepcion = 4;
 					break;
 
 				case 1:
-					if(dato=='U')
+					if (dato == 'U')
 						Estado_Recepcion++;
 					else
-						Estado_Recepcion=0;
+						Estado_Recepcion = 0;
 					break;
 
 				case 2:
-					if(dato=='B')
+					if (dato == 'B')
 						Estado_Recepcion++;
 					else
-						Estado_Recepcion=0;
+						Estado_Recepcion = 0;
 					break;
 
 				case 3:
-					if(dato=='I')
+					if (dato == 'I')
 					{
-						Estado_Recepcion=0;
+						Estado_Recepcion = 0;
 						Encolar_SMS(MSJ_UBICACION);
 					}
 					else
-						Estado_Recepcion=0;
+						Estado_Recepcion = 0;
 					break;
 
 				case 4:
-					if(dato=='C')
+					if (dato == 'C')
 						Estado_Recepcion++;
 					else
-						Estado_Recepcion=0;
+						Estado_Recepcion = 0;
 					break;
 
 				case 5:
-					if(dato=='M')
+					if (dato == 'M')
 						Estado_Recepcion++;
 					else
-						Estado_Recepcion=0;
+						Estado_Recepcion = 0;
 					break;
 
 				case 6:
-					if(dato=='T')
+					if (dato == 'T')
 						Estado_Recepcion++;
 					else
-						Estado_Recepcion=0;
+						Estado_Recepcion = 0;
 					break;
 
 				case 7:
-					if(dato==':')
+					if (dato == ':')
 						Estado_Recepcion++;
 					else
-						Estado_Recepcion=0;
+						Estado_Recepcion = 0;
 					break;
 
 				case 8:
-					if(dato==' ')
+					if (dato == ' ')
 						Estado_Recepcion++;
 					else
-						Estado_Recepcion=0;
+						Estado_Recepcion = 0;
 					break;
 
 				case 9:
-					if(dato=='"')
+					if (dato == '"')
 						Estado_Recepcion++;
 					else
-						Estado_Recepcion=0;
+						Estado_Recepcion = 0;
 					break;
 
 				case 10:
-					if(dato=='+')
+					if (dato == '+')
 					{
 						Estado_Recepcion++;
-						pos_num=0;
-						flag_num_valido=false;
+						pos_num = 0;
+						flag_num_valido = false;
 					}
 					else
-						Estado_Recepcion=0;
+						Estado_Recepcion = 0;
 					break;
 
 				case 11:
-					if((dato>='0')||(dato<='9'))
+					if ((dato >= '0') || (dato <= '9'))
 					{
 						//Guardo el numero de quien me envió el SMS
-						Numero_Cel[pos_num]=dato;
+						Numero_Cel[pos_num] = dato;
 						pos_num++;
 
-						if(pos_num>=13)
+						if (pos_num >= 13)
 						{
-							flag_num_valido=true;
-							Estado_Recepcion=0;
+							flag_num_valido = true;
+							Estado_Recepcion = 0;
 							Encolar_SMS(MSJ_UBICACION);
 						}
 					}
 					else
 					{
-						Estado_Recepcion=0;
-						pos_num=0;
-						flag_num_valido=false;
+						Estado_Recepcion = 0;
+						pos_num = 0;
+						flag_num_valido = false;
 					}
 					break;
 
@@ -188,19 +192,18 @@ void Recepcion_Modem (uint8_t dato)
 
 }
 
-
 //********************************************************************************
 // Función:				  Borrar_Buffer_Rx
 //
 //********************************************************************************
 void Borrar_Buffer_Rx(void)
 {
-	for(int i=0; i<SIZE_RX; i++)
+	for (int i = 0; i < SIZE_RX; i++)
 	{
-		dato_Rx[i]=0;
+		dato_Rx[i] = 0;
 	}
 
-	indice=0;
+	indice = 0;
 }
 
 //********************************************************************************
@@ -211,7 +214,7 @@ void Borrar_Buffer_Rx(void)
 void Encolar_SMS(uint8_t mensaje)
 {
 	//Si el mensaje que quiero enviar, no se está enviando en esto momento, lo agrego en la cola
-	if(mensaje != mensaje_enviandose)
+	if (mensaje != mensaje_enviandose)
 	{
 		mensaje_a_enviar = mensaje;
 	}
@@ -227,75 +230,75 @@ void Enviar_SMS(void)
 	uint8_t controlZ = 26; // 26 es el valor ASCII para CTRL+Z
 	char Buffer_Comando_Num[30];
 
-	switch(estado_envio_SMS)
+	switch (estado_envio_SMS)
 	{
 		case 0:
-			if(mensaje_a_enviar!=0)
+			if (mensaje_a_enviar != 0)
 			{
-				mensaje_enviandose=mensaje_a_enviar;
+				mensaje_enviandose = mensaje_a_enviar;
 
-				send_uart("\n\r SMS a enviar: ",UART_1);
-				switch(mensaje_enviandose)
+				send_uart("\n\r SMS a enviar: ", UART_1);
+
+				switch (mensaje_enviandose)
 				{
 					default:
-						send_uart("Mensaje generado por error",UART_1);
-					break;
+						send_uart("Mensaje generado por error", UART_1);
+						break;
 
 					case MSJ_BOTON_PANICO:
-						send_uart("Boton de Panico ",UART_1);
+						send_uart("Boton de Panico ", UART_1);
 
-						if(GPS.Estado == 'A')//A = posicion valida
-							Armar_Link_Google_Maps(UART_1); //Mando la ultima ubicación valida indicando su fecha y hora
+						if (GPS.Estado == 'A') //A = posicion valida
+							Armar_Ubi_Google(UART_1,GOOGLE_MAPS,false); //Mando la ultima ubicación valida indicando su fecha y hora
 						break;
 
 					case MSJ_MOV_BRUSCO:
-						send_uart("Movimiento Brusco ",UART_1);
+						send_uart("Movimiento Brusco ", UART_1);
 
-						if(GPS.Estado == 'A')//A = posicion valida
-							Armar_Link_Google_Maps(UART_1); //Mando la ultima ubicación valida indicando su fecha y hora
+						if (GPS.Estado == 'A') //A = posicion valida
+							Armar_Ubi_Google(UART_1,GOOGLE_MAPS,false); //Mando la ultima ubicación valida indicando su fecha y hora
 						break;
 
 					case MSJ_UBICACION:
-						if(GPS.Estado == 'A')//A = posicion valida
+						if (GPS.Estado == 'A') //A = posicion valida
 						{
-							Armar_Link_Google_Maps(UART_1); //Mando la ultima ubicación valida indicando su fecha y hora
+							Armar_Ubi_Google(UART_1,GOOGLE_MAPS,false); //Mando la ultima ubicación valida indicando su fecha y hora
 
-							send_uart("Solicitud de Seguimiento",UART_1);
+							send_uart("Solicitud de Seguimiento", UART_1);
 						}
 						else
-							send_uart("Ubicacion desconocida",UART_1);
+							send_uart("Ubicacion desconocida", UART_1);
 						break;
-
 
 					case TOMO_GPS:
-						if(GPS.Estado == 'A')//A = posicion valida
+						if (GPS.Estado == 'A') //A = posicion valida
 						{
-							Armar_Link_Google_Maps(UART_1); //Mando la ultima ubicación valida indicando su fecha y hora
+							Armar_Ubi_Google(UART_1,GOOGLE_MAPS,false); //Mando la ultima ubicación valida indicando su fecha y hora
 
-							send_uart("Posicion establecida",UART_1);
+							send_uart("Posicion establecida", UART_1);
 						}
 						else
-							send_uart("Ubicacion desconocida",UART_1);
+							send_uart("Ubicacion desconocida", UART_1);
 						break;
 				}
-				send_uart("\n\r",UART_1);
+				send_uart("\n\r", UART_1);
 
 				estado_envio_SMS++;
-				mensaje_a_enviar=0;
-				comando_a_recibir=0;
-				comando_recibido=0;
+				mensaje_a_enviar = 0;
+				comando_a_recibir = 0;
+				comando_recibido = 0;
 			}
 			break;
 
 		case 1:
-			if(!primer_mensaje_enviado)//Solo se envía la primera vez
+			if (!primer_mensaje_enviado) //Solo se envía la primera vez
 			{
-				if((!comando_a_recibir)||(contador_comando%TIEMPO_REINTENTO_COMANDO==0))
+				if ((!comando_a_recibir) || (contador_comando % TIEMPO_REINTENTO_COMANDO == 0))
 				{
-					send_uart("AT+CFUN=1\r\n",UART_2);
+					send_uart("AT+CFUN=1\r\n", UART_2);
 					espero_comando(COMANDO_OK);
 				}
-				else if(comando_recibido == comando_a_recibir)
+				else if (comando_recibido == comando_a_recibir)
 				{
 					comando_a_recibir = 0;
 					comando_recibido = 0;
@@ -304,16 +307,16 @@ void Enviar_SMS(void)
 				}
 			}
 			else
-				estado_envio_SMS=6;
+				estado_envio_SMS = 6;
 			break;
 
 		case 2:
-			if((!comando_a_recibir)||(contador_comando%TIEMPO_REINTENTO_COMANDO==0))
+			if ((!comando_a_recibir)|| (contador_comando % TIEMPO_REINTENTO_COMANDO == 0))
 			{
-				send_uart("AT+CNMI=2,2,0,0,0\r\n",UART_2);
+				send_uart("AT+CNMI=2,2,0,0,0\r\n", UART_2);
 				espero_comando(COMANDO_OK);
 			}
-			else if(comando_recibido == comando_a_recibir)
+			else if (comando_recibido == comando_a_recibir)
 			{
 				comando_a_recibir = 0;
 				comando_recibido = 0;
@@ -323,12 +326,12 @@ void Enviar_SMS(void)
 			break;
 
 		case 3:
-			if((!comando_a_recibir)||(contador_comando%TIEMPO_REINTENTO_COMANDO==0))
+			if ((!comando_a_recibir)|| (contador_comando % TIEMPO_REINTENTO_COMANDO == 0))
 			{
-				send_uart("AT+CMGF=1\r\n",UART_2);
+				send_uart("AT+CMGF=1\r\n", UART_2);
 				espero_comando(COMANDO_OK);
 			}
-			else if(comando_recibido == comando_a_recibir)
+			else if (comando_recibido == comando_a_recibir)
 			{
 				comando_a_recibir = 0;
 				comando_recibido = 0;
@@ -338,12 +341,12 @@ void Enviar_SMS(void)
 			break;
 
 		case 4:
-			if((!comando_a_recibir)||(contador_comando%TIEMPO_REINTENTO_COMANDO==0))
+			if ((!comando_a_recibir) || (contador_comando % TIEMPO_REINTENTO_COMANDO == 0))
 			{
-				send_uart("AT+CGATT=1\r\n",UART_2);
+				send_uart("AT+CGATT=1\r\n", UART_2);
 				espero_comando(COMANDO_OK);
 			}
-			else if(comando_recibido == comando_a_recibir)
+			else if (comando_recibido == comando_a_recibir)
 			{
 				comando_a_recibir = 0;
 				comando_recibido = 0;
@@ -353,27 +356,27 @@ void Enviar_SMS(void)
 			break;
 
 		case 5:
-				if((!comando_a_recibir)||(contador_comando%TIEMPO_REINTENTO_COMANDO==0))
-				{
-					send_uart("AT+CSTT=\"igprs.claro.com.ar\"\r\n",UART_2);
-					espero_comando(COMANDO_OK);
-				}
-				else if(comando_recibido == comando_a_recibir)
-				{
-					comando_a_recibir = 0;
-					comando_recibido = 0;
-					contador_comando = 0;
-					estado_envio_SMS++;
-				}
+			if ((!comando_a_recibir)|| (contador_comando % TIEMPO_REINTENTO_COMANDO == 0))
+			{
+				send_uart("AT+CSTT=\"igprs.claro.com.ar\"\r\n", UART_2);
+				espero_comando(COMANDO_OK);
+			}
+			else if (comando_recibido == comando_a_recibir)
+			{
+				comando_a_recibir = 0;
+				comando_recibido = 0;
+				contador_comando = 0;
+				estado_envio_SMS++;
+			}
 			break;
 
 		case 6:
-			if((!comando_a_recibir)||(contador_comando%TIEMPO_REINTENTO_COMANDO==0))
+			if ((!comando_a_recibir)|| (contador_comando % TIEMPO_REINTENTO_COMANDO == 0))
 			{
-				send_uart("AT+CSCA=\"+543200000001\"\r\n",UART_2);
+				send_uart("AT+CSCA=\"+543200000001\"\r\n", UART_2);
 				espero_comando(COMANDO_OK);
 			}
-			else if(comando_recibido == comando_a_recibir)
+			else if (comando_recibido == comando_a_recibir)
 			{
 				comando_a_recibir = 0;
 				comando_recibido = 0;
@@ -383,20 +386,20 @@ void Enviar_SMS(void)
 			break;
 
 		case 7:
-			if((!comando_a_recibir)||(contador_comando%TIEMPO_REINTENTO_COMANDO==0))
+			if ((!comando_a_recibir)|| (contador_comando % TIEMPO_REINTENTO_COMANDO == 0))
 			{
-				if(!flag_num_valido)
-					send_uart("AT+CMGS=\"+5491164881307\"\r\n",UART_2); //Por default envio a mi numero personal
+				if (!flag_num_valido)
+					send_uart("AT+CMGS=\"+5491164881307\"\r\n", UART_2); //Por default envio a mi numero personal
 				else
 				{
 					//Si se registró el numero que pidió la ubicacion, se lo manda a ese numero
-					sprintf(Buffer_Comando_Num,"AT+CMGS=\"+%s\"\r\n", Numero_Cel);
-					send_uart(Buffer_Comando_Num,UART_2);
-					flag_num_valido=0;
+					sprintf(Buffer_Comando_Num, "AT+CMGS=\"+%s\"\r\n", Numero_Cel);
+					send_uart(Buffer_Comando_Num, UART_2);
+					flag_num_valido = 0;
 				}
 				espero_comando(COMANDO_PICO);
 			}
-			else if(comando_recibido == comando_a_recibir)
+			else if (comando_recibido == comando_a_recibir)
 			{
 				comando_a_recibir = 0;
 				comando_recibido = 0;
@@ -406,55 +409,54 @@ void Enviar_SMS(void)
 			break;
 
 		case 8:
-			if((!comando_a_recibir)||(contador_comando%TIEMPO_REINTENTO_COMANDO==0))
+			if ((!comando_a_recibir)|| (contador_comando % TIEMPO_REINTENTO_COMANDO == 0))
 			{
-				switch(mensaje_enviandose)
+				switch (mensaje_enviandose)
 				{
 					default:
-						send_uart("Mensaje generado por error",UART_2);
-					break;
+						send_uart("Mensaje generado por error", UART_2);
+						break;
 
 					case MSJ_BOTON_PANICO:
-						if(GPS.Estado == 'A')//A = posicion valida
-							Armar_Link_Google_Maps(UART_2); //Mando la ultima ubicación valida indicando su fecha y hora
+						if (GPS.Estado == 'A') //A = posicion valida
+							Armar_Ubi_Google(UART_2,GOOGLE_MAPS,false); //Mando la ultima ubicación valida indicando su fecha y hora
 
-						send_uart("Boton de Panico",UART_2);
+						send_uart("Boton de Panico", UART_2);
 						break;
 
 					case MSJ_MOV_BRUSCO:
-						if(GPS.Estado == 'A')//A = posicion valida
-							Armar_Link_Google_Maps(UART_2); //Mando la ultima ubicación valida indicando su fecha y hora
+						if (GPS.Estado == 'A') //A = posicion valida
+							Armar_Ubi_Google(UART_2,GOOGLE_MAPS,false); //Mando la ultima ubicación valida indicando su fecha y hora
 
-						send_uart("Movimiento Brusco",UART_2);
+						send_uart("Movimiento Brusco", UART_2);
 						break;
 
 					case MSJ_UBICACION:
-						if(GPS.Estado == 'A')//A = posicion valida
+						if (GPS.Estado == 'A') //A = posicion valida
 						{
-							Armar_Link_Google_Maps(UART_2); //Mando la ultima ubicación valida indicando su fecha y hora
+							Armar_Ubi_Google(UART_2,GOOGLE_MAPS,false); //Mando la ultima ubicación valida indicando su fecha y hora
 
-							send_uart("Solicitud de Seguimiento",UART_2);
+							send_uart("Solicitud de Seguimiento", UART_2);
 						}
 						else
-							send_uart("Ubicacion desconocida",UART_2);
+							send_uart("Ubicacion desconocida", UART_2);
 						break;
 
-
 					case TOMO_GPS:
-						if(GPS.Estado == 'A')//A = posicion valida
+						if (GPS.Estado == 'A') //A = posicion valida
 						{
-							Armar_Link_Google_Maps(UART_2); //Mando la ultima ubicación valida indicando su fecha y hora
+							Armar_Ubi_Google(UART_2,GOOGLE_MAPS,false); //Mando la ultima ubicación valida indicando su fecha y hora
 
-							send_uart("Posicion establecida",UART_2);
+							send_uart("Posicion establecida", UART_2);
 						}
 						else
-							send_uart("Ubicacion desconocida",UART_2);
+							send_uart("Ubicacion desconocida", UART_2);
 						break;
 				}
 				HAL_UART_Transmit(&huart2, &controlZ, 1, 2000);
 				espero_comando(COMANDO_OK);
 			}
-			else if(comando_recibido == comando_a_recibir)
+			else if (comando_recibido == comando_a_recibir)
 			{
 				comando_a_recibir = 0;
 				comando_recibido = 0;
@@ -465,10 +467,10 @@ void Enviar_SMS(void)
 
 		case 9:
 			//Ya se tuvo que haber enviado el mensaje anterior
-			mensaje_enviandose=0;
-			estado_envio_SMS=0;
-			primer_mensaje_enviado=true;
-			send_uart("\r\n SMS ENVIADO \r\n",UART_1);
+			mensaje_enviandose = 0;
+			estado_envio_SMS = 0;
+			primer_mensaje_enviado = true;
+			send_uart("\r\n SMS ENVIADO \r\n", UART_1);
 			break;
 
 	}
@@ -497,7 +499,49 @@ void Cancelar_SMS(void)
 	comando_a_recibir = 0;
 	comando_recibido = 0;
 	contador_comando = 0;
-	mensaje_enviandose=0;
-	estado_envio_SMS=0;
-	send_uart("\r\n SMS CANCELADO POR TIMEOUT \r\n",UART_1);
+	mensaje_enviandose = 0;
+	estado_envio_SMS = 0;
+	send_uart("\r\n SMS CANCELADO POR TIMEOUT \r\n", UART_1);
 }
+
+//********************************************************************************
+// Función:				  FS_Guardar_Ubicacion
+//
+// Descripción:	Guarda la Ubicación GPS dentro del FileSystem del Modulo
+//********************************************************************************
+void FS_Guardar_Ubicacion(void)
+{
+
+	//Si no existe, debería crearlo
+	//send_uart("AT+FSCREATE=UBI.TXT\r\n",UART_2);
+
+	//HAL_Delay(200);
+
+	//-------------------------------------------------------------------
+	//ARCHIVO CON PUNTOS PARA GOOGLE EARTH
+
+	//Comando para escribir el archivo
+	//AT+FSWRITE=(archivo),(1:al final),(cantidad a escribir),(timeout)
+	send_uart("AT+FSWRITE=EARTH.TXT,1,30,1000\r\n", UART_2);
+
+	//HAL_Delay(200);
+	for(int i=0; i<0xFFFF;i++){}
+
+	Armar_Ubi_Google(UART_2, GOOGLE_EARTH,true);
+
+	for(int i=0; i<0xFFFF;i++){}
+
+	//-------------------------------------------------------------------
+	//ARCHIVO DE ULTIMA POSICION
+	//Comando para escribir el archivo
+	//AT+FSWRITE=(archivo),(0: al inicio),(cantidad a escribir),(timeout)
+	send_uart("AT+FSWRITE=UBI.TXT,0,76,1000\r\n", UART_2);
+
+	//HAL_Delay(200);
+	for(int i=0; i<0xFFFF;i++){}
+
+	Armar_Ubi_Google(UART_2, GOOGLE_MAPS,true);
+
+
+}
+#endif

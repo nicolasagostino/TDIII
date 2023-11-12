@@ -20,7 +20,6 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "fatfs.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -44,8 +43,6 @@
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c2;
 
-SPI_HandleTypeDef hspi1;
-
 TIM_HandleTypeDef htim1;
 
 UART_HandleTypeDef huart1;
@@ -56,6 +53,7 @@ UART_HandleTypeDef huart2;
 _Bool flag_1s=0;
 _Bool flag_50ms=0;
 uint8_t contador_100ms;
+uint8_t contador_20s;
 //MPU6050
 
 extern float Ax;
@@ -68,18 +66,22 @@ uint8_t movimiento_brusco_on=0;
 //Boton de Pánico
 unsigned int delay_boton;
 unsigned int estado_boton;
-//Modem
+
 uint8_t cadena[3];
+#ifdef USE_SIM808
+//Modem
 extern uint8_t mensaje_enviandose;
 extern uint32_t contador_comando;
 extern uint8_t comando_a_recibir;
 extern uint8_t estado_envio_SMS;
-//microSD
-SPISD spisd;
-SPISD *mainSD = &spisd;
-uint8_t Sector0[516];
+extern uint8_t contador_seg;
+#endif
+
+#ifdef USE_GPS
 //GPS
 extern struct GPS_Data GPS_aux;
+extern _Bool flag_primer_GPS;
+#endif
 //Led
 uint8_t contador_led=0;
 /* USER CODE END PV */
@@ -91,7 +93,6 @@ static void MX_I2C2_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_USART2_UART_Init(void);
-static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
 /* USER CODE END PFP */
 
@@ -103,14 +104,18 @@ void HAL_TIM_OC_DelayElapsedCallback (TIM_HandleTypeDef *htim)
 	if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1) {
 		//Acá entra cada 1seg
 		flag_1s=1;
+
+		if(contador_seg!=0)
+			contador_seg++;
+
 		pulse = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);
-		__HAL_TIM_SET_COMPARE(htim, TIM_CHANNEL_1, (pulse + (1000)));
+		__HAL_TIM_SET_COMPARE(htim, TIM_CHANNEL_1, (pulse + (2400)));
 	}
 	if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2) {
 		//Acá entra cada 50ms
 		flag_50ms=1;
 		pulse = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_2);
-		__HAL_TIM_SET_COMPARE(htim, TIM_CHANNEL_2, (pulse + (50)));
+		__HAL_TIM_SET_COMPARE(htim, TIM_CHANNEL_2, (pulse + (120)));
 	}
 }
 
@@ -215,15 +220,28 @@ void send_uart(char *string, uint8_t uart_a_enviar)
 }
 
 //********************************************************************************
+// Función:				  buffsize
+//
+// Descripción:	Calcula el tamaño del buffer
+//********************************************************************************
+int bufsize (char *buff)
+{
+	int i=0;
+	while(*buff++ != '\0') i++;
+	return i;
+}
+//********************************************************************************
 // Función:				  Manejo_Led
 //
 // Descripción:	Se modifica la velocidad en la que titila el led segun el estado
 //********************************************************************************
 void Manejo_Led(void)
 {
+
 	//Aca entra cada 50ms;
 	contador_led++;
 
+#ifdef USE_SIM808
 	if(mensaje_enviandose != 0)
 	{
 		//Si está enviando un SMS titila bien rápido (c/ 100ms)
@@ -235,7 +253,7 @@ void Manejo_Led(void)
 	}
 	else if(GPS_aux.Estado != 'A')
 	{
-		//Si no tiene GPS titila rápido, pero no tanto como cuando manda un SMS (c/ 250ms)
+		//Si no tiene GPS titila rápido, pero no tanto como cuando manda un SMS (c/ 300ms)
 		if(contador_led>5)
 		{
 			HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
@@ -244,13 +262,17 @@ void Manejo_Led(void)
 	}
 	else
 	{
+#endif
 		//En estado normal titila lento (c/ 1s)
 		if(contador_led>19)
 		{
 			HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 			contador_led=0;
 		}
+
+#ifdef USE_SIM808
 	}
+#endif
 
 }
 
@@ -264,6 +286,7 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
 	char BufferDebug[100];
+	//uint8_t data_a[3];
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -280,11 +303,13 @@ int main(void)
 
   /* USER CODE BEGIN SysInit */
   //SD
+  /*
   spisd.FSM=Encendido;
-  spisd.csPuerto = NSS_GPIO_Port;
-  spisd.csPin = NSS_Pin;
+  spisd.csPuerto = SPI1_NSS_GPIO_Port;
+  spisd.csPin = SPI1_NSS_Pin;
   spisd.puertoSPI = &hspi1;
   spisd.sectorAddressing=1; //Asumimos SDHC (+2GB)
+  */
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -293,18 +318,25 @@ int main(void)
   MX_USART1_UART_Init();
   MX_TIM1_Init();
   MX_USART2_UART_Init();
-  MX_SPI1_Init();
-  MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
   mpu6050Init();
   //HAL_UART_Receive_IT(&huart1, &byte1, 1);
+
   HAL_UART_Receive_IT(&huart1, cadena, 1);
   HAL_UART_Receive_IT(&huart2, cadena, 1);
 
   send_uart("\n\r ****************************** \n\r",UART_1);
   send_uart("\n\r      Proyecto Localizador      \n\r",UART_1);
-  send_uart("\n\r          Version 1.6           \n\r",UART_1);
+  send_uart("\n\r          Version 1.7           \n\r",UART_1);
   send_uart("\n\r ****************************** \n\r",UART_1);
+
+/*
+
+  data_a[0]= 0x21u;
+  data_a[1]= 0x22u;
+  data_a[2]= 0x23u;
+
+  HAL_SPI_Transmit(&hspi1, data_a, 3u, 1000u);
 
 
   //Creo un archivo en la tarjeta microSD
@@ -319,7 +351,48 @@ int main(void)
 
 
   }
+*/
 
+/*
+  fresult = f_mount(&fs, "/", 1);
+  if (fresult != FR_OK) send_uart ("ERROR!!! in mounting SD CARD...\n\n",UART_1);
+  else send_uart("SD CARD mounted successfully...\n\n",UART_1);
+
+
+  // Create second file with read write access and open it 
+  fresult = f_open(&fil, "file2.txt", FA_CREATE_ALWAYS | FA_WRITE);
+
+  // Writing text
+  strcpy (buffer, "This is File2.txt, written using ...f_write... and it says Hello from Controllerstech\n");
+
+  fresult = f_write(&fil, buffer, bufsize(buffer), &bw);
+
+  // Close file 
+  f_close(&fil);
+
+
+  // Open second file to read 
+  fresult = f_open(&fil, "file2.txt", FA_READ);
+  if (fresult == FR_OK)send_uart ("file2.txt is open and the data is shown below\n",UART_1);
+
+  // Read data from the file
+  // Please see the function details for the arguments
+  f_read (&fil, buffer, f_size(&fil), &br);
+  send_uart(buffer,UART_1);
+  send_uart("\n\n",UART_1);
+
+  // Close file 
+  f_close(&fil);
+
+  //Delete file
+  //fresult = f_unlink("/file2.txt");
+  //if (fresult == FR_OK) send_uart("file2.txt removed successfully...\n");
+  
+
+  // Unmount SDCARD
+  fresult = f_mount(NULL, "/", 1);
+  if (fresult == FR_OK) send_uart ("SD CARD UNMOUNTED successfully...\n",UART_1);
+*/
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -331,13 +404,13 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
 
-
+#ifdef USE_SIM808
 	//Verifico si tocó el botón de pánico
 	if(Verificar_Boton(BOTON_PANICO))
 	{
-
 		Encolar_SMS(MSJ_BOTON_PANICO);
 	}
+#endif
 
 
 	/*------------------- Divisor 5ms ---------------------*/
@@ -349,6 +422,7 @@ int main(void)
 
 		Manejo_Led();
 
+#ifdef USE_SIM808
 		if(mensaje_enviandose!=0)
 		{
 			contador_comando++;
@@ -368,6 +442,7 @@ int main(void)
 
 			}
 		}
+#endif
 
 		//Boton de pánico
 		if(delay_boton>0)
@@ -387,7 +462,9 @@ int main(void)
 			sprintf(BufferDebug,"Gx: %.2f | Gy: %.2f | Gz: %.2f\n\r", Gx, Gy, Gz);
 			send_uart(BufferDebug,UART_1);
 
+#ifdef USE_SIM808
 			Encolar_SMS(MSJ_MOV_BRUSCO);
+#endif
 		}
 
 	}
@@ -398,7 +475,9 @@ int main(void)
 	{
 		contador_100ms=0;
 
+#ifdef USE_SIM808
 		Enviar_SMS();
+#endif
 	}
 
 	/*-------------------- Divisor 1seg --------------------*/
@@ -419,6 +498,20 @@ int main(void)
 			movimiento_brusco_on--;
 
 		flag_1s=0;
+
+		contador_20s++;
+
+		if(contador_20s > 19)
+		{
+			contador_20s=0;
+
+			//Cada 20 seg guardo la ubicacion (Si tengo datos GPS y no estoy enviando un SMS)
+			if(flag_primer_GPS==true && mensaje_enviandose==false)
+			{
+				send_uart("\n\r Guardo posicion en FS \n\r",UART_1);
+				FS_Guardar_Ubicacion();
+			}
+		}
 	}
 	/*------------------------------------------------------*/
   }
@@ -443,7 +536,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL2;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -454,10 +547,10 @@ void SystemClock_Config(void)
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
@@ -498,44 +591,6 @@ static void MX_I2C2_Init(void)
 }
 
 /**
-  * @brief SPI1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_SPI1_Init(void)
-{
-
-  /* USER CODE BEGIN SPI1_Init 0 */
-
-  /* USER CODE END SPI1_Init 0 */
-
-  /* USER CODE BEGIN SPI1_Init 1 */
-
-  /* USER CODE END SPI1_Init 1 */
-  /* SPI1 parameter configuration*/
-  hspi1.Instance = SPI1;
-  hspi1.Init.Mode = SPI_MODE_MASTER;
-  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
-  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128;
-  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
-  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-  hspi1.Init.CRCPolynomial = 10;
-  if (HAL_SPI_Init(&hspi1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN SPI1_Init 2 */
-
-  /* USER CODE END SPI1_Init 2 */
-
-}
-
-/**
   * @brief TIM1 Initialization Function
   * @param None
   * @retval None
@@ -556,7 +611,7 @@ static void MX_TIM1_Init(void)
 
   /* USER CODE END TIM1_Init 1 */
   htim1.Instance = TIM1;
-  htim1.Init.Prescaler = 16000;
+  htim1.Init.Prescaler = 30000;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim1.Init.Period = 65535;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -582,7 +637,7 @@ static void MX_TIM1_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_TIMING;
-  sConfigOC.Pulse = 1000;
+  sConfigOC.Pulse = 2400;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
@@ -592,7 +647,7 @@ static void MX_TIM1_Init(void)
   {
     Error_Handler();
   }
-  sConfigOC.Pulse = 5;
+  sConfigOC.Pulse = 120;
   if (HAL_TIM_OC_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
   {
     Error_Handler();
@@ -699,9 +754,6 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(NSS_GPIO_Port, NSS_Pin, GPIO_PIN_RESET);
-
   /*Configure GPIO pin : LED_Pin */
   GPIO_InitStruct.Pin = LED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -715,13 +767,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(BOTON_PANICO_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : NSS_Pin */
-  GPIO_InitStruct.Pin = NSS_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(NSS_GPIO_Port, &GPIO_InitStruct);
-
 }
 
 /* USER CODE BEGIN 4 */
@@ -734,13 +779,17 @@ static void MX_GPIO_Init(void)
 //********************************************************************************
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
+#if defined (USE_GPS) ||  defined (USE_SIM808)
 	uint8_t dato_recibido = cadena[0];
+#endif
 
 	if(huart->Instance == USART1)
 	{
 		//Interrupción por recepción de datos por UART1 (GPS)
 
+#ifdef USE_GPS
 		Recepcion_GPS(dato_recibido);
+#endif
 
 		HAL_UART_Receive_IT(&huart1, cadena, 1);
 	}
@@ -748,7 +797,9 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 	{
 		//Interrupción por recepción de datos por UART2 (Modem)
 
+#ifdef USE_SIM808
 		Recepcion_Modem(dato_recibido);
+#endif
 
 		HAL_UART_Receive_IT(&huart2, cadena, 1);
 	}

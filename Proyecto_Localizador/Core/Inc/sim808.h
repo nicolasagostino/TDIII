@@ -9,9 +9,6 @@
 #define INC_SIM808_H_
 
 //***************** Defines **************************//
-#define UART_1	1
-#define UART_2	2
-
 
 #define SIZE_RX 30
 
@@ -37,7 +34,7 @@ void Encolar_SMS(uint8_t);
 void Enviar_SMS(void);
 void espero_comando(uint8_t);
 void Cancelar_SMS(void);
-
+void FS_Guardar_Ubicacion(void);
 //****************************************************//
 
 #endif /* INC_SIM808_H_ */
