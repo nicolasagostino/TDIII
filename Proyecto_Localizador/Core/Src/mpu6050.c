@@ -23,7 +23,12 @@ int16_t RAWaccelZ;
 float Ax, Ay, Az;
 float Gx, Gy, Gz;
 
-
+//***************************************************************************
+// Función: mpu6050Init()
+//
+// Descripción: Inicializa el módulo MPU6050, leyendo su identificación para
+//				verificar la conexión.
+//***************************************************************************
 void mpu6050Init(void){
 
 	HAL_I2C_Mem_Read(
@@ -37,6 +42,12 @@ void mpu6050Init(void){
 				);
 }
 
+//***************************************************************************
+// Función: mpu6050powerOn()
+//
+// Descripción: Enciende el MPU6050 configurando el registro de
+//				administración de energía.
+//***************************************************************************
 void mpu6050powerOn(void){
 	MemData = 0x00;
 	HAL_I2C_Mem_Write(
@@ -50,6 +61,12 @@ void mpu6050powerOn(void){
 			);
 }
 
+//***************************************************************************
+// Función: mpu6050Sampling()
+//
+// Descripción: Configura la tasa de muestreo del MPU6050 para la lectura de
+//				datos.
+//***************************************************************************
 void mpu6050Sampling(void){
 	MemData = 0x07;
 	HAL_I2C_Mem_Write(
@@ -63,6 +80,12 @@ void mpu6050Sampling(void){
 			);
 }
 
+//***************************************************************************
+// Función: mpu6050GyroScale(gyroScale_t scale)
+//
+// Descripción: Configura la escala del giroscopio del MPU6050 según la
+//				escala especificada.
+//***************************************************************************
 void mpu6050GyroScale(gyroScale_t scale){
 	MemData = 0x00 | (scale << 3);
 
@@ -77,6 +100,12 @@ void mpu6050GyroScale(gyroScale_t scale){
 			);
 }
 
+//***************************************************************************
+// Función: mpu6050AccelScale(accelScale_t scale)
+//
+// Descripción: Configura la escala del acelerómetro del MPU6050 según la
+//				escala especificada.
+//***************************************************************************
 void mpu6050AccelScale(accelScale_t scale){
 	MemData = 0x00 | (scale << 3);
 
@@ -91,6 +120,12 @@ void mpu6050AccelScale(accelScale_t scale){
 			);
 }
 
+//***************************************************************************
+// Función: mpu6050Config()
+//
+// Descripción: Configura el MPU6050 con parámetros predefinidos si la
+//				identificación del dispositivo es la esperada (mpu6050)
+//**************************************************************************
 void mpu6050Config(void){
 	// is valid Condition true 0x68
 	mpu6050Init();
@@ -107,6 +142,11 @@ void mpu6050Config(void){
 	}
 }
 
+//***************************************************************************
+// Función: mpu6050GyroRead()
+//
+// Descripción: Lee y calcula las velocidades angulares del giroscopio.
+//***************************************************************************
 void mpu6050GyroRead(void){
 	uint8_t gyroData[6];
 	HAL_I2C_Mem_Read(
@@ -128,6 +168,11 @@ void mpu6050GyroRead(void){
 	Gz = RAWgyroZ/131.0;
 }
 
+//***************************************************************************
+// Función: mpu6050AccelRead()
+//
+// Descripción: Lee y calcula las aceleraciones del acelerómetro.
+//***************************************************************************
 void mpu6050AccelRead(void){
 	uint8_t accelData[6];
 	HAL_I2C_Mem_Read(
@@ -148,3 +193,4 @@ void mpu6050AccelRead(void){
 	Ay = RAWaccelY/16384.0;
 	Az = RAWaccelZ/16384.0;
 }
+

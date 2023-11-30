@@ -209,7 +209,7 @@ void Borrar_Buffer_Rx(void)
 //********************************************************************************
 // Función:				  Encolar_SMS
 //
-// Descripción:	Mete en la cola de SMS el proximo mensaje a enviar
+// Descripción:	Ingresa en la cola de SMS el proximo mensaje a enviar
 //********************************************************************************
 void Encolar_SMS(uint8_t mensaje)
 {
@@ -220,10 +220,11 @@ void Encolar_SMS(uint8_t mensaje)
 	}
 }
 //********************************************************************************
-// Función:				  Enviar_SMS
+// Función:		Enviar_SMS
 //
-// Descripción:	Envia los comandos al Modem para enviar un SMS fijo a un número
-// 				predefinido, sin verificar las respuestas del modem
+// Descripción:	Envía los comandos al módem para enviar un SMS indicando el
+//				evento por el cual se genera el SMS y el link de Google Maps a la
+//				última posición válida, con su fecha y hora.
 //********************************************************************************
 void Enviar_SMS(void)
 {
@@ -492,7 +493,7 @@ void espero_comando(uint8_t comando)
 //********************************************************************************
 // Función:				  Cancelar_SMS
 //
-// Descripción:	Cancela el envio de SMS
+// Descripción:	Cancela el envio de SMS y lo informa por puerto serial
 //********************************************************************************
 void Cancelar_SMS(void)
 {
@@ -507,7 +508,7 @@ void Cancelar_SMS(void)
 //********************************************************************************
 // Función:				  FS_Guardar_Ubicacion
 //
-// Descripción:	Guarda la Ubicación GPS dentro del FileSystem del Modulo
+// Descripción:	Guarda la Ubicación GPS dentro del FileSystem del SIM808
 //********************************************************************************
 void FS_Guardar_Ubicacion(void)
 {

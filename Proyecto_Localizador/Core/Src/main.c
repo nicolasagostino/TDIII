@@ -302,14 +302,7 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-  //SD
-  /*
-  spisd.FSM=Encendido;
-  spisd.csPuerto = SPI1_NSS_GPIO_Port;
-  spisd.csPin = SPI1_NSS_Pin;
-  spisd.puertoSPI = &hspi1;
-  spisd.sectorAddressing=1; //Asumimos SDHC (+2GB)
-  */
+
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -330,69 +323,6 @@ int main(void)
   send_uart("\n\r          Version 1.7           \n\r",UART_1);
   send_uart("\n\r ****************************** \n\r",UART_1);
 
-/*
-
-  data_a[0]= 0x21u;
-  data_a[1]= 0x22u;
-  data_a[2]= 0x23u;
-
-  HAL_SPI_Transmit(&hspi1, data_a, 3u, 1000u);
-
-
-  //Creo un archivo en la tarjeta microSD
-  f_mount(&USERFatFS,USERPath,0);
-  f_open(&USERFile,"MiArch.txt",FA_CREATE_ALWAYS | FA_WRITE);
-  uint32_t output;
-  if (f_write(&USERFile,"Hola Mundo SD Card!",sizeof("Hola Mundo SD Card!"),(void*)&output)==FR_OK)
-  {
-	  if (f_sync(&USERFile)==FR_OK){
-		  f_close(&USERFile);
-	  }
-
-
-  }
-*/
-
-/*
-  fresult = f_mount(&fs, "/", 1);
-  if (fresult != FR_OK) send_uart ("ERROR!!! in mounting SD CARD...\n\n",UART_1);
-  else send_uart("SD CARD mounted successfully...\n\n",UART_1);
-
-
-  // Create second file with read write access and open it 
-  fresult = f_open(&fil, "file2.txt", FA_CREATE_ALWAYS | FA_WRITE);
-
-  // Writing text
-  strcpy (buffer, "This is File2.txt, written using ...f_write... and it says Hello from Controllerstech\n");
-
-  fresult = f_write(&fil, buffer, bufsize(buffer), &bw);
-
-  // Close file 
-  f_close(&fil);
-
-
-  // Open second file to read 
-  fresult = f_open(&fil, "file2.txt", FA_READ);
-  if (fresult == FR_OK)send_uart ("file2.txt is open and the data is shown below\n",UART_1);
-
-  // Read data from the file
-  // Please see the function details for the arguments
-  f_read (&fil, buffer, f_size(&fil), &br);
-  send_uart(buffer,UART_1);
-  send_uart("\n\n",UART_1);
-
-  // Close file 
-  f_close(&fil);
-
-  //Delete file
-  //fresult = f_unlink("/file2.txt");
-  //if (fresult == FR_OK) send_uart("file2.txt removed successfully...\n");
-  
-
-  // Unmount SDCARD
-  fresult = f_mount(NULL, "/", 1);
-  if (fresult == FR_OK) send_uart ("SD CARD UNMOUNTED successfully...\n",UART_1);
-*/
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -413,7 +343,7 @@ int main(void)
 #endif
 
 
-	/*------------------- Divisor 5ms ---------------------*/
+	/*------------------- Divisor 50ms ---------------------*/
 	if(flag_50ms)
 	{
 		flag_50ms=0;
@@ -470,7 +400,7 @@ int main(void)
 	}
 
 
-	/*-------------------- Divisor 200ms --------------------*/
+	/*-------------------- Divisor 100ms --------------------*/
 	if(contador_100ms>=2)
 	{
 		contador_100ms=0;

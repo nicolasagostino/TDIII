@@ -588,7 +588,8 @@ void ajustarSegunGMT(struct GPS_Data *dt, int GMT_offset)
 //********************************************************************************
 // Función:				  Armar_Ubi_Google
 //
-// Descripción:	Ubica el punto en el que estamos ubicados en el Google Maps
+// Descripción:	Ubica el punto en el que estamos ubicados en el Google Maps o
+//				Google Earth
 //********************************************************************************
 void Armar_Ubi_Google(uint8_t uart_envio, uint8_t app, _Bool guardar_FS)
 {
